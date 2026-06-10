@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}任务 - JM Downloader{% endblock %}
+{% block content %}
+<section class="panel">
+  <div class="section-head">
+    <h1>下载任务</h1>
+    <button type="button" onclick="window.location.reload()">刷新</button>
+  </div>
+  <div class="task-list">
+    {% for task in tasks %}
+    <article class="task-row" data-task-id="{{ task.id }}">
+      <div>
+        <strong>JM{{ task.album_id }}</strong>
+        <span class="badge {{ task.status }}">{{ task.status }}</span>
+      </div>
+      <p>{{ task.progress }}</p>
+      {% if task.output_path %}<p class="muted">{{ task.output_path }}</p>{% endif %}
+      {% if task.error %}<p class="error">{{ task.error }}</p>{% endif %}
+    </article>
+    {% else %}
+    <p class="muted">暂无任务。</p>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

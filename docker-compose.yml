@@ -1,0 +1,15 @@
+services:
+  jm-downloader:
+    image: c3ez/jm-downloader:latest
+    container_name: jm-downloader
+    ports:
+      - "8000:8000"
+    environment:
+      JM_ADMIN_PASSWORD: "admin"
+      JM_SESSION_SECRET: "please-change-this"
+      JM_DATA_DIR: "/app/data"
+      JM_DOWNLOAD_DIR: "/downloads"
+    volumes:
+      - ./data:/app/data
+      - ./downloads:/downloads
+    restart: unless-stopped

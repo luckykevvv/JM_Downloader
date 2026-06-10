@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}设置 - JM Downloader{% endblock %}
+{% block content %}
+<section class="panel">
+  <h1>设置</h1>
+  {% if saved %}<p class="success">已保存。</p>{% endif %}
+  <form method="post" action="/settings" class="settings-form">
+    <label>
+      Client 实现
+      <select name="client_impl">
+        <option value="api" {% if settings.client_impl == "api" %}selected{% endif %}>api</option>
+        <option value="html" {% if settings.client_impl == "html" %}selected{% endif %}>html</option>
+      </select>
+    </label>
+    <label>
+      下载目录
+      <input name="download_dir" value="{{ settings.download_dir }}" required>
+    </label>
+    <label>
+      图片线程数
+      <input name="image_threads" type="number" min="1" max="100" value="{{ settings.image_threads }}">
+    </label>
+    <label>
+      章节线程数
+      <input name="photo_threads" type="number" min="1" max="32" value="{{ settings.photo_threads }}">
+    </label>
+    <label class="check-row">
+      <input name="keep_images" type="checkbox" value="true" {% if settings.keep_images %}checked{% endif %}>
+      保留临时图片目录
+    </label>
+    <label class="check-row">
+      <input name="single_volume_folder" type="checkbox" value="true" {% if settings.single_volume_folder %}checked{% endif %}>
+      单行本也单独放进标题文件夹
+    </label>
+    <label>
+      订阅检查间隔（分钟）
+      <input name="subscription_interval_minutes" type="number" min="1" value="{{ settings.subscription_interval_minutes }}">
+    </label>
+    <label>
+      代理
+      <input name="proxies" placeholder="http://127.0.0.1:7890 或 JSON" value="{{ settings.proxies }}">
+    </label>
+    <label>
+      Cookies
+      <textarea name="cookies" rows="4" placeholder="AVS=...; other=... 或 JSON">{{ settings.cookies }}</textarea>
+    </label>
+    <label>
+      域名
+      <textarea name="domains" rows="4" placeholder="每行一个域名">{{ settings.domains }}</textarea>
+    </label>
+    <div class="actions">
+      <button type="submit">保存</button>
+      <button type="button" id="test-settings">测试连接</button>
+      <span id="settings-status"></span>
+    </div>
+  </form>
+</section>
+{% endblock %}

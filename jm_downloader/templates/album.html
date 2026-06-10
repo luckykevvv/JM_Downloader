@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}JM{{ album_id }} - JM Downloader{% endblock %}
+{% block content %}
+<section class="panel" id="album-panel" data-album-id="{{ album_id }}">
+  <div class="album-head">
+    <img class="album-cover" id="album-cover" alt="封面" loading="lazy">
+    <div>
+      <h1 id="album-title">JM{{ album_id }}</h1>
+      <p class="muted" id="album-meta">加载详情中...</p>
+    </div>
+    <div class="actions">
+      <button id="download-selected" data-album-id="{{ album_id }}" disabled>下载所选章节</button>
+      <button type="button" data-subscribe="{{ album_id }}">订阅</button>
+    </div>
+  </div>
+  <p class="summary" id="album-description"></p>
+  <dl class="metadata" id="album-metadata">
+    <div><dt>作者</dt><dd data-field="authors">-</dd></div>
+    <div><dt>标签</dt><dd data-field="tags">-</dd></div>
+    <div><dt>作品</dt><dd data-field="works">-</dd></div>
+    <div><dt>角色</dt><dd data-field="actors">-</dd></div>
+    <div><dt>发布</dt><dd data-field="pub_date">-</dd></div>
+    <div><dt>更新</dt><dd data-field="update_date">-</dd></div>
+  </dl>
+</section>
+
+<section class="panel">
+  <div class="section-head">
+    <h2>章节</h2>
+    <div class="actions">
+      <button type="button" data-select-all>全选</button>
+      <button type="button" data-select-none>清空</button>
+    </div>
+  </div>
+  <form id="chapter-form" class="chapter-list">
+    <p class="muted">章节加载中...</p>
+  </form>
+  <p id="download-status" class="muted"></p>
+  <p id="subscription-status" class="muted"></p>
+</section>
+{% endblock %}

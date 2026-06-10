@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}搜索 - JM Downloader{% endblock %}
+{% block content %}
+<section class="panel">
+  <h1>搜索漫画</h1>
+  <form id="search-form" class="toolbar">
+    <input name="query" placeholder="输入 ID、标题、作者、标签、作品或角色" required>
+    <select name="type">
+      <option value="site">标题/站内</option>
+      <option value="id">ID</option>
+      <option value="author">作者</option>
+      <option value="tag">标签</option>
+      <option value="work">作品</option>
+      <option value="actor">角色</option>
+    </select>
+    <select name="order">
+      <option value="mr">最新</option>
+      <option value="mv">观看</option>
+      <option value="mp">图片数</option>
+      <option value="tf">喜欢</option>
+      <option value="tr">评分</option>
+      <option value="md">评论</option>
+    </select>
+    <select name="time">
+      <option value="a">全部时间</option>
+      <option value="t">今日</option>
+      <option value="w">本周</option>
+      <option value="m">本月</option>
+    </select>
+    <input name="page" type="number" min="1" value="1">
+    <button type="submit">搜索</button>
+  </form>
+</section>
+
+<section class="panel">
+  <div class="section-head">
+    <h2>订阅库</h2>
+    <button type="button" id="check-subscriptions">检查更新</button>
+  </div>
+  <div id="subscription-status" class="muted"></div>
+  <div class="subscription-grid">
+    {% for subscription in subscriptions %}
+    <article class="subscription-card" data-album-id="{{ subscription.album_id }}">
+      <img src="{{ subscription.cover_url }}" alt="{{ subscription.title }} 封面" loading="lazy">
+      <div>
+        <a href="/album/{{ subscription.album_id }}">{{ subscription.title }}</a>
+        <p class="muted">JM{{ subscription.album_id }} · {{ subscription.known_photo_ids | length }} 章</p>
+        <p>{{ subscription.status }}</p>
+        {% if subscription.last_checked_at %}<p class="muted">上次检查：{{ subscription.last_checked_at }}</p>{% endif %}
+        {% if subscription.last_error %}<p class="error">{{ subscription.last_error }}</p>{% endif %}
+        <button type="button" data-unsubscribe="{{ subscription.album_id }}">取消订阅</button>
+      </div>
+    </article>
+    {% else %}
+    <p class="muted">暂无订阅。</p>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="panel">
+  <div class="section-head">
+    <h2>结果</h2>
+    <span id="search-status"></span>
+  </div>
+  <div id="results" class="result-list"></div>
+</section>
+{% endblock %}

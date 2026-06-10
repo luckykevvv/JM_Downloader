@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}JM Downloader{% endblock %}</title>
+    <link rel="stylesheet" href="/static/app.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/">JM Downloader</a>
+      <nav>
+        <a href="/">搜索</a>
+        <a href="/tasks">任务</a>
+        <a href="/settings">设置</a>
+        <form action="/logout" method="post">
+          <button class="link-button" type="submit">退出</button>
+        </form>
+      </nav>
+    </header>
+    <main class="shell">
+      {% block content %}{% endblock %}
+    </main>
+    <script src="/static/app.js"></script>
+    {% block scripts %}{% endblock %}
+  </body>
+</html>
