@@ -37,6 +37,11 @@ class PartialDownloadError(DownloadError):
 class SelectedPhotoDownloader(JmDownloader):
     selected_photo_ids: set[str] | None = None
     progress_callback: Callable[..., None] | None = None
+    cancel_callback: Callable[[], bool] | None = None
+
+    def is_cancelled(self) -> bool:
+        callback = type(self).cancel_callback
+        return bool(callback and callback())
 
     def emit_progress(self, message: str, current: int | None = None, total: int | None = None) -> None:
         callback = type(self).progress_callback
@@ -47,11 +52,15 @@ class SelectedPhotoDownloader(JmDownloader):
                 callback(message, current, total)
 
     def do_filter(self, detail):
+        if self.is_cancelled():
+            return []
         if detail.is_album() and self.selected_photo_ids:
             return [photo for photo in detail if str(photo.id) in self.selected_photo_ids]
         return detail
 
     def before_album(self, album):
+        if self.is_cancelled():
+            album.skip = True
         photos = list(self.do_filter(album))
         self._chapter_total = len(photos)
         self._chapter_done = 0
@@ -60,6 +69,8 @@ class SelectedPhotoDownloader(JmDownloader):
         return super().before_album(album)
 
     def before_photo(self, photo):
+        if self.is_cancelled():
+            photo.skip = True
         self.emit_progress(
             f"Downloading chapter {photo.index}: {photo.title}",
             getattr(self, "_chapter_done", 0),
@@ -80,6 +91,11 @@ class SelectedPhotoDownloader(JmDownloader):
             getattr(self, "_chapter_total", 0),
         )
         return super().after_photo(photo)
+
+    def before_image(self, image, img_save_path):
+        if self.is_cancelled():
+            image.skip = True
+        return super().before_image(image, img_save_path)
 
 
 class JmService:
@@ -216,6 +232,7 @@ class JmService:
         album_id: str,
         selected_photo_ids: Iterable[str] | None = None,
         progress: Callable[[str], None] | None = None,
+        cancel: Callable[[], bool] | None = None,
     ) -> Path:
         settings = self.settings()
 
@@ -226,6 +243,7 @@ class JmService:
             class TaskDownloader(SelectedPhotoDownloader):
                 selected_photo_ids = selected or None
                 progress_callback = progress
+                cancel_callback = cancel
 
             album, downloader = jmcomic.download_album(
                 album_id,

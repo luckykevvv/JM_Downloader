@@ -149,6 +149,10 @@ class Storage:
             row = con.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
         return self._row_to_task(row) if row else None
 
+    def delete_task(self, task_id: str) -> None:
+        with self.connect() as con:
+            con.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+
     def list_tasks(self, limit: int = 100) -> list[DownloadTask]:
         with self.connect() as con:
             rows = con.execute("SELECT * FROM tasks ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()

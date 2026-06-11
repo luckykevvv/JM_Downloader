@@ -70,7 +70,12 @@ document.addEventListener("click", async (event) => {
     downloadButton.disabled = true;
     downloadButton.textContent = "已加入队列";
     try {
-      await createDownload(downloadButton.dataset.downloadAlbum, []);
+      const task = await createDownload(downloadButton.dataset.downloadAlbum, []);
+      const status = document.querySelector("#search-status");
+      if (status) {
+        status.innerHTML = `任务已创建：<a href="/tasks">${escapeHtml(task.id)}</a>${renderTaskStatus(task)}`;
+        watchTask(task.id, status);
+      }
     } catch (error) {
       downloadButton.disabled = false;
       downloadButton.textContent = "下载";
@@ -94,6 +99,12 @@ document.addEventListener("click", async (event) => {
   const retryButton = event.target.closest("[data-retry-task]");
   if (retryButton) {
     await retryTask(retryButton);
+    return;
+  }
+
+  const deleteButton = event.target.closest("[data-delete-task]");
+  if (deleteButton) {
+    await deleteTask(deleteButton);
   }
 });
 
@@ -188,11 +199,11 @@ function updateTaskRow(row, task) {
   if (text) text.textContent = task.progress || "";
   const current = Number(task.progress_current || 0);
   const total = Number(task.progress_total || 0);
-  const bar = row.querySelector("[data-task-progress-bar]");
-  if (bar) {
-    bar.value = current;
-    bar.max = total > 0 ? total : 1;
-  }
+  const percent = progressPercent(current, total);
+  const fill = row.querySelector("[data-task-progress-fill]");
+  if (fill) fill.style.width = `${percent}%`;
+  const percentText = row.querySelector("[data-task-progress-percent]");
+  if (percentText) percentText.textContent = `${percent}%`;
   const count = row.querySelector("[data-task-progress-count]");
   if (count) count.textContent = total > 0 ? `${current}/${total}` : "等待开始";
   const failedIds = task.failed_photo_ids || [];
@@ -224,18 +235,41 @@ async function retryTask(button) {
   }
 }
 
+async function deleteTask(button) {
+  const taskId = button.dataset.deleteTask;
+  button.disabled = true;
+  button.textContent = "删除中...";
+  try {
+    await jsonFetch(`/api/downloads/${encodeURIComponent(taskId)}`, { method: "DELETE" });
+    button.closest(".task-row")?.remove();
+    showStatus("任务已删除，本地缓存已清理");
+  } catch (error) {
+    button.disabled = false;
+    button.textContent = "删除任务并清理缓存";
+    showStatus(error.message, true);
+  }
+}
+
 function renderTaskStatus(task) {
   const current = Number(task.progress_current || 0);
   const total = Number(task.progress_total || 0);
   const label = total > 0 ? `${current}/${total}` : "等待开始";
-  const max = total > 0 ? total : 1;
+  const percent = progressPercent(current, total);
   return `
-    <span>${escapeHtml(task.status)}: ${escapeHtml(task.progress)}</span>
-    <span class="task-progress">
-      <progress value="${escapeAttr(current)}" max="${escapeAttr(max)}"></progress>
+    <span class="task-status-line">${escapeHtml(task.status)}: ${escapeHtml(task.progress)}</span>
+    <span class="task-progress" data-task-progress>
+      <span class="task-progress-track" aria-label="下载进度">
+        <span class="task-progress-fill" style="width: ${escapeAttr(percent)}%"></span>
+      </span>
+      <span class="task-progress-percent">${escapeHtml(percent)}%</span>
       <span class="muted">${escapeHtml(label)}</span>
     </span>
   `;
+}
+
+function progressPercent(current, total) {
+  if (!total || total <= 0) return 0;
+  return Math.max(0, Math.min(100, Math.round((current / total) * 100)));
 }
 
 async function loadAlbumDetail(albumId) {

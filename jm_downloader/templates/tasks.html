@@ -14,8 +14,12 @@
         <span class="badge {{ task.status }}" data-task-status-badge>{{ task.status }}</span>
       </div>
       <p data-task-progress-text>{{ task.progress }}</p>
-      <div class="task-progress">
-        <progress data-task-progress-bar value="{{ task.progress_current }}" max="{{ task.progress_total if task.progress_total else 1 }}"></progress>
+      {% set progress_percent = (task.progress_current * 100 / task.progress_total) if task.progress_total else 0 %}
+      <div class="task-progress" data-task-progress>
+        <div class="task-progress-track" aria-label="下载进度">
+          <div class="task-progress-fill" data-task-progress-fill style="width: {{ progress_percent }}%"></div>
+        </div>
+        <span class="task-progress-percent" data-task-progress-percent>{{ "%.0f"|format(progress_percent) }}%</span>
         <span class="muted" data-task-progress-count>
           {% if task.progress_total %}{{ task.progress_current }}/{{ task.progress_total }}{% else %}等待开始{% endif %}
         </span>
@@ -25,6 +29,9 @@
       <div class="actions" data-task-retry {% if not task.failed_photo_ids %}hidden{% endif %}>
         <button type="button" data-retry-task="{{ task.id }}">重试失败章节</button>
         <span class="muted" data-task-failed-count>{{ task.failed_photo_ids | length }} 章待重试</span>
+      </div>
+      <div class="actions">
+        <button type="button" class="danger-button" data-delete-task="{{ task.id }}">删除任务并清理缓存</button>
       </div>
     </article>
     {% else %}

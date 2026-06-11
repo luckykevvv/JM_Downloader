@@ -215,6 +215,15 @@ def api_retry_download(task_id: str):
     return task.as_dict()
 
 
+@app.delete("/api/downloads/{task_id}", dependencies=[Depends(api_require_login)])
+def api_delete_download(task_id: str):
+    try:
+        download_queue.delete_task(task_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"ok": True}
+
+
 @app.get("/api/downloads/{task_id}/events", dependencies=[Depends(api_require_login)])
 async def api_download_events(task_id: str):
     async def events():
