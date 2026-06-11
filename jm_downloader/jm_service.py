@@ -18,6 +18,9 @@ from .models import AlbumInfo, AppSettings, ChapterInfo, SearchResult
 from .utils import ensure_inside, parse_cookies, parse_lines, safe_filename
 
 
+COVER_SIZE = "_3x4"
+
+
 class DownloadError(RuntimeError):
     pass
 
@@ -254,14 +257,25 @@ class JmService:
                     source = Path(path)
                     if source.exists():
                         archive.write(source, source.name)
+            self._write_local_book_cover(cbz_path, cover_path)
+
+        album_folder_name = safe_filename(metadata_album.title, f"JM{album.id}")
+        if cover_path is not None and cover_path.exists() and (multi_chapter or album_dir.name == album_folder_name):
+            shutil.copyfile(cover_path, album_dir / "cover.jpg")
 
     def _download_album_cover(self, album, temp_dir: Path) -> Path | None:
         cover_path = temp_dir / f"cover-{album.id}.jpg"
         with suppress(Exception):
-            self.client().download_album_cover(album.id, str(cover_path), size="")
+            self.client().download_album_cover(album.id, str(cover_path), size=COVER_SIZE)
             if cover_path.exists() and cover_path.stat().st_size > 0:
                 return cover_path
         return None
+
+    @staticmethod
+    def _write_local_book_cover(cbz_path: Path, cover_path: Path | None) -> None:
+        if cover_path is None or not cover_path.exists():
+            return
+        shutil.copyfile(cover_path, cbz_path.with_suffix(".jpg"))
 
     @staticmethod
     def _copy_images(temp_dir: Path, album_dir: Path) -> None:
@@ -285,7 +299,7 @@ class JmService:
         return Path(root).resolve()
 
     @staticmethod
-    def cover_url(album_id: str, size: str = "_3x4") -> str:
+    def cover_url(album_id: str, size: str = COVER_SIZE) -> str:
         return JmcomicText.get_album_cover_url(str(album_id), size=size)
 
     @classmethod

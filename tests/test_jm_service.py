@@ -2,7 +2,7 @@ import zipfile
 from pathlib import Path
 from types import SimpleNamespace
 
-from jm_downloader.jm_service import JmService, SelectedPhotoDownloader
+from jm_downloader.jm_service import COVER_SIZE, JmService, SelectedPhotoDownloader
 from jm_downloader.models import AppSettings
 
 
@@ -161,6 +161,73 @@ def test_write_cbz_files_contains_comicinfo_and_images(tmp_path):
         assert "ComicInfo.xml" in archive.namelist()
         assert "cover.jpg" in archive.namelist()
         assert "001.jpg" in archive.namelist()
+    assert (out_dir / "Album.jpg").read_bytes() == b"cover"
+    assert (out_dir / "cover.jpg").read_bytes() == b"cover"
+
+
+def test_write_cbz_files_uses_komga_book_art_without_root_series_cover(tmp_path):
+    service = JmService(lambda: settings(tmp_path))
+    album = FakeAlbum([FakePhoto("10", 1, "Chapter 1")])
+    image_path = tmp_path / "001.jpg"
+    image_path.write_bytes(b"img")
+    cover_path = tmp_path / "cover-source.jpg"
+    cover_path.write_bytes(b"cover")
+    photo = album.photos[0]
+    downloader = SimpleNamespace(download_success_dict={album: {photo: [(str(image_path), SimpleNamespace(index=1))]}})
+    out_dir = tmp_path / "downloads"
+    out_dir.mkdir()
+
+    service._write_cbz_files(album, downloader, out_dir, set(), cover_path=cover_path)
+
+    assert (out_dir / "Album.cbz").exists()
+    assert (out_dir / "Album.jpg").read_bytes() == b"cover"
+    assert not (out_dir / "cover.jpg").exists()
+
+
+def test_write_cbz_files_uses_komga_series_art_for_multichapter(tmp_path):
+    service = JmService(lambda: settings(tmp_path))
+    album = FakeAlbum([FakePhoto("10", 1, "Chapter 1"), FakePhoto("11", 2, "Chapter 2")])
+    first_image = tmp_path / "001.jpg"
+    second_image = tmp_path / "002.jpg"
+    first_image.write_bytes(b"img1")
+    second_image.write_bytes(b"img2")
+    cover_path = tmp_path / "cover-source.jpg"
+    cover_path.write_bytes(b"cover")
+    downloader = SimpleNamespace(
+        download_success_dict={
+            album: {
+                album.photos[0]: [(str(first_image), SimpleNamespace(index=1))],
+                album.photos[1]: [(str(second_image), SimpleNamespace(index=1))],
+            }
+        }
+    )
+    out_dir = tmp_path / "Album"
+    out_dir.mkdir()
+
+    service._write_cbz_files(album, downloader, out_dir, set(), cover_path=cover_path)
+
+    assert (out_dir / "001 - Chapter 1.cbz").exists()
+    assert (out_dir / "001 - Chapter 1.jpg").read_bytes() == b"cover"
+    assert (out_dir / "002 - Chapter 2.jpg").read_bytes() == b"cover"
+    assert (out_dir / "cover.jpg").read_bytes() == b"cover"
+
+
+def test_download_album_cover_uses_web_cover_size(monkeypatch, tmp_path):
+    service = JmService(lambda: settings(tmp_path))
+    calls = []
+
+    class FakeCoverClient:
+        def download_album_cover(self, album_id, save_path, size=""):
+            calls.append((album_id, size))
+            Path(save_path).write_bytes(b"cover")
+
+    monkeypatch.setattr(service, "client", lambda: FakeCoverClient())
+
+    cover_path = service._download_album_cover(SimpleNamespace(id="123"), tmp_path)
+
+    assert cover_path is not None
+    assert cover_path.read_bytes() == b"cover"
+    assert calls == [("123", COVER_SIZE)]
 
 
 def test_decide_output_dir_can_skip_single_volume_folder(tmp_path):
