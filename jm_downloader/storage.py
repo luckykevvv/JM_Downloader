@@ -68,6 +68,8 @@ class Storage:
         return AppSettings(
             client_impl=values.get("client_impl", "api"),
             download_dir=values.get("download_dir", default_download_dir),
+            single_download_dir=values.get("single_download_dir", values.get("download_dir", default_download_dir)),
+            series_download_dir=values.get("series_download_dir", values.get("download_dir", default_download_dir)),
             image_threads=int(values.get("image_threads", "30") or 30),
             photo_threads=int(values.get("photo_threads", "4") or 4),
             keep_images=values.get("keep_images", "false") == "true",
@@ -82,6 +84,8 @@ class Storage:
         data = {
             "client_impl": settings.client_impl,
             "download_dir": settings.download_dir,
+            "single_download_dir": settings.single_download_dir,
+            "series_download_dir": settings.series_download_dir,
             "image_threads": str(settings.image_threads),
             "photo_threads": str(settings.photo_threads),
             "keep_images": "true" if settings.keep_images else "false",

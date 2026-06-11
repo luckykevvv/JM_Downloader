@@ -13,6 +13,8 @@ TaskStatus = Literal["queued", "running", "completed", "failed"]
 class AppSettings:
     client_impl: str = "api"
     download_dir: str = ""
+    single_download_dir: str = ""
+    series_download_dir: str = ""
     image_threads: int = 30
     photo_threads: int = 4
     keep_images: bool = False

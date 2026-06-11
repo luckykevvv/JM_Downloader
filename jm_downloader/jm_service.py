@@ -184,8 +184,6 @@ class JmService:
         progress: Callable[[str], None] | None = None,
     ) -> Path:
         settings = self.settings()
-        download_root = Path(settings.download_dir).resolve()
-        download_root.mkdir(parents=True, exist_ok=True)
 
         selected = {str(pid) for pid in selected_photo_ids or [] if str(pid).strip()}
         with tempfile.TemporaryDirectory(prefix="jm-download-") as temp_dir:
@@ -202,6 +200,8 @@ class JmService:
                 check_exception=True,
             )
             metadata_album = self._best_metadata_album(album)
+            download_root = self._decide_download_root(settings, album)
+            download_root.mkdir(parents=True, exist_ok=True)
             output_dir = self._decide_output_dir(download_root, metadata_album, album, settings.single_volume_folder)
             ensure_inside(download_root, output_dir)
             output_dir.mkdir(parents=True, exist_ok=True)
@@ -263,6 +263,14 @@ class JmService:
         if len(album) == 1 and not single_volume_folder:
             return download_root
         return download_root / safe_filename(metadata_album.title, f"JM{album.id}")
+
+    @staticmethod
+    def _decide_download_root(settings: AppSettings, album) -> Path:
+        if len(album) == 1:
+            root = settings.single_download_dir or settings.download_dir
+        else:
+            root = settings.series_download_dir or settings.download_dir
+        return Path(root).resolve()
 
     @staticmethod
     def cover_url(album_id: str, size: str = "_3x4") -> str:

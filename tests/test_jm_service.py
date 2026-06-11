@@ -174,6 +174,21 @@ def test_decide_output_dir_keeps_multichapter_folder(tmp_path):
     assert out == tmp_path / "Album"
 
 
+def test_decide_download_root_uses_separate_single_and_series_dirs(tmp_path):
+    single = tmp_path / "single"
+    series = tmp_path / "series"
+    settings_obj = AppSettings(
+        download_dir=str(tmp_path / "default"),
+        single_download_dir=str(single),
+        series_download_dir=str(series),
+    )
+    single_album = FakeAlbum([FakePhoto("10", 1, "Chapter 1")])
+    series_album = FakeAlbum([FakePhoto("10", 1, "Chapter 1"), FakePhoto("11", 2, "Chapter 2")])
+
+    assert JmService._decide_download_root(settings_obj, single_album) == single.resolve()
+    assert JmService._decide_download_root(settings_obj, series_album) == series.resolve()
+
+
 class FakeAlbum:
     id = "999"
     title = "Album"

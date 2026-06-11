@@ -13,8 +13,16 @@
       </select>
     </label>
     <label>
-      下载目录
+      默认下载目录
       <input name="download_dir" value="{{ settings.download_dir }}" required>
+    </label>
+    <label>
+      单行本下载目录
+      <input name="single_download_dir" value="{{ settings.single_download_dir }}" placeholder="留空则使用默认下载目录">
+    </label>
+    <label>
+      连载/多章节下载目录
+      <input name="series_download_dir" value="{{ settings.series_download_dir }}" placeholder="留空则使用默认下载目录">
     </label>
     <label>
       图片线程数

@@ -90,6 +90,8 @@ def settings_page(request: Request, saved: str = ""):
 def save_settings(
     client_impl: str = Form("api"),
     download_dir: str = Form(str(DOWNLOAD_DIR)),
+    single_download_dir: str = Form(""),
+    series_download_dir: str = Form(""),
     image_threads: int = Form(30),
     photo_threads: int = Form(4),
     keep_images: bool = Form(False),
@@ -103,6 +105,8 @@ def save_settings(
         AppSettings(
             client_impl=client_impl,
             download_dir=download_dir,
+            single_download_dir=single_download_dir or download_dir,
+            series_download_dir=series_download_dir or download_dir,
             image_threads=max(1, image_threads),
             photo_threads=max(1, photo_threads),
             keep_images=keep_images,

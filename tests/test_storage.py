@@ -8,6 +8,8 @@ def test_settings_persist(tmp_path):
         AppSettings(
             client_impl="html",
             download_dir=str(tmp_path / "downloads"),
+            single_download_dir=str(tmp_path / "single"),
+            series_download_dir=str(tmp_path / "series"),
             image_threads=7,
             photo_threads=2,
             keep_images=True,
@@ -21,6 +23,8 @@ def test_settings_persist(tmp_path):
     loaded = storage.get_settings("fallback")
 
     assert loaded.client_impl == "html"
+    assert loaded.single_download_dir == str(tmp_path / "single")
+    assert loaded.series_download_dir == str(tmp_path / "series")
     assert loaded.image_threads == 7
     assert loaded.keep_images is True
     assert loaded.single_volume_folder is False
