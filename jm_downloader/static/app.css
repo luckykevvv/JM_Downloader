@@ -9,6 +9,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
 }
@@ -294,8 +298,23 @@ textarea {
   background: #dff3e7;
 }
 
+.badge.partial {
+  background: #ffe7c7;
+}
+
 .badge.failed {
   background: #ffe0e0;
+}
+
+.task-progress {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.task-progress progress {
+  height: 10px;
+  width: min(260px, 100%);
 }
 
 .metadata {

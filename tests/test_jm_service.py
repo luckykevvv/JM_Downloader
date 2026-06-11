@@ -212,6 +212,57 @@ def test_write_cbz_files_uses_komga_series_art_for_multichapter(tmp_path):
     assert (out_dir / "cover.jpg").read_bytes() == b"cover"
 
 
+def test_write_cbz_files_skips_empty_failed_chapters(tmp_path):
+    service = JmService(lambda: settings(tmp_path))
+    album = FakeAlbum([FakePhoto("10", 1, "Chapter 1"), FakePhoto("11", 2, "Chapter 2")])
+    image_path = tmp_path / "001.jpg"
+    image_path.write_bytes(b"img")
+    cover_path = tmp_path / "cover-source.jpg"
+    cover_path.write_bytes(b"cover")
+    downloader = SimpleNamespace(
+        download_success_dict={
+            album: {
+                album.photos[0]: [(str(image_path), SimpleNamespace(index=1))],
+                album.photos[1]: [],
+            }
+        }
+    )
+    out_dir = tmp_path / "Album"
+    out_dir.mkdir()
+
+    service._write_cbz_files(album, downloader, out_dir, set(), cover_path=cover_path)
+
+    assert (out_dir / "001 - Chapter 1.cbz").exists()
+    assert not (out_dir / "002 - Chapter 2.cbz").exists()
+
+
+def test_write_cbz_files_skips_chapters_with_failed_images(tmp_path):
+    service = JmService(lambda: settings(tmp_path))
+    album = FakeAlbum([FakePhoto("10", 1, "Chapter 1"), FakePhoto("11", 2, "Chapter 2")])
+    first_image = tmp_path / "001.jpg"
+    second_image = tmp_path / "002.jpg"
+    first_image.write_bytes(b"img1")
+    second_image.write_bytes(b"img2")
+    failed_image = SimpleNamespace(from_photo=album.photos[1], download_url="https://example.test/002.jpg")
+    downloader = SimpleNamespace(
+        download_success_dict={
+            album: {
+                album.photos[0]: [(str(first_image), SimpleNamespace(index=1))],
+                album.photos[1]: [(str(second_image), SimpleNamespace(index=1))],
+            }
+        },
+        download_failed_image=[(failed_image, ValueError("broken"))],
+        download_failed_photo=[],
+    )
+    out_dir = tmp_path / "Album"
+    out_dir.mkdir()
+
+    service._write_cbz_files(album, downloader, out_dir, set())
+
+    assert (out_dir / "001 - Chapter 1.cbz").exists()
+    assert not (out_dir / "002 - Chapter 2.cbz").exists()
+
+
 def test_download_album_cover_uses_web_cover_size(monkeypatch, tmp_path):
     service = JmService(lambda: settings(tmp_path))
     calls = []

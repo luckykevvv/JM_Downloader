@@ -206,6 +206,15 @@ def api_get_download(task_id: str):
     return task.as_dict()
 
 
+@app.post("/api/downloads/{task_id}/retry", dependencies=[Depends(api_require_login)])
+def api_retry_download(task_id: str):
+    try:
+        task = download_queue.retry_failed(task_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return task.as_dict()
+
+
 @app.get("/api/downloads/{task_id}/events", dependencies=[Depends(api_require_login)])
 async def api_download_events(task_id: str):
     async def events():
@@ -219,7 +228,7 @@ async def api_download_events(task_id: str):
             if payload != last_payload:
                 yield f"data: {payload}\n\n"
                 last_payload = payload
-            if task.status in {"completed", "failed"}:
+            if task.status in {"completed", "partial", "failed"}:
                 break
             await asyncio.sleep(1)
 

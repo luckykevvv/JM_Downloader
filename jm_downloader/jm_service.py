@@ -22,17 +22,29 @@ COVER_SIZE = "_3x4"
 
 
 class DownloadError(RuntimeError):
-    pass
+    def __init__(self, message: str, failed_photo_ids: list[str] | None = None):
+        super().__init__(message)
+        self.failed_photo_ids = failed_photo_ids or []
+
+
+class PartialDownloadError(DownloadError):
+    def __init__(self, message: str, output_path: Path, failed_photo_ids: list[str]):
+        super().__init__(message)
+        self.output_path = output_path
+        self.failed_photo_ids = failed_photo_ids
 
 
 class SelectedPhotoDownloader(JmDownloader):
     selected_photo_ids: set[str] | None = None
-    progress_callback: Callable[[str], None] | None = None
+    progress_callback: Callable[..., None] | None = None
 
-    def emit_progress(self, message: str) -> None:
+    def emit_progress(self, message: str, current: int | None = None, total: int | None = None) -> None:
         callback = type(self).progress_callback
         if callback:
-            callback(message)
+            if current is None or total is None:
+                callback(message)
+            else:
+                callback(message, current, total)
 
     def do_filter(self, detail):
         if detail.is_album() and self.selected_photo_ids:
@@ -40,15 +52,33 @@ class SelectedPhotoDownloader(JmDownloader):
         return detail
 
     def before_album(self, album):
-        self.emit_progress(f"Album loaded: {album.title}")
+        photos = list(self.do_filter(album))
+        self._chapter_total = len(photos)
+        self._chapter_done = 0
+        self._progress_lock = threading.Lock()
+        self.emit_progress(f"Album loaded: {album.title}", 0, self._chapter_total)
         return super().before_album(album)
 
     def before_photo(self, photo):
-        self.emit_progress(f"Downloading chapter {photo.index}: {photo.title}")
+        self.emit_progress(
+            f"Downloading chapter {photo.index}: {photo.title}",
+            getattr(self, "_chapter_done", 0),
+            getattr(self, "_chapter_total", 0),
+        )
         return super().before_photo(photo)
 
     def after_photo(self, photo):
-        self.emit_progress(f"Downloaded chapter {photo.index}: {photo.title}")
+        lock = getattr(self, "_progress_lock", None)
+        if lock is None:
+            self._chapter_done = getattr(self, "_chapter_done", 0) + 1
+        else:
+            with lock:
+                self._chapter_done = getattr(self, "_chapter_done", 0) + 1
+        self.emit_progress(
+            f"Downloaded chapter {photo.index}: {photo.title}",
+            getattr(self, "_chapter_done", 0),
+            getattr(self, "_chapter_total", 0),
+        )
         return super().after_photo(photo)
 
 
@@ -201,7 +231,7 @@ class JmService:
                 album_id,
                 option=option,
                 downloader=TaskDownloader,
-                check_exception=True,
+                check_exception=False,
             )
             metadata_album = self._best_metadata_album(album)
             download_root = self._decide_download_root(settings, album)
@@ -210,13 +240,23 @@ class JmService:
             ensure_inside(download_root, output_dir)
             output_dir.mkdir(parents=True, exist_ok=True)
             cover_path = self._download_album_cover(album, Path(temp_dir))
-            self._write_cbz_files(album, downloader, output_dir, selected, metadata_album, cover_path)
+            try:
+                self._write_cbz_files(album, downloader, output_dir, selected, metadata_album, cover_path)
+            except DownloadError as exc:
+                failed_photo_ids = self._failed_photo_ids(downloader)
+                if failed_photo_ids:
+                    raise DownloadError(str(exc), failed_photo_ids) from exc
+                raise
 
             if settings.keep_images:
                 self._copy_images(Path(temp_dir), output_dir)
 
             if progress:
                 progress(f"Completed: {output_dir}")
+            failure_message = self._download_failure_message(downloader)
+            if failure_message:
+                failed_photo_ids = self._failed_photo_ids(downloader)
+                raise PartialDownloadError(f"{failure_message}\n已保存成功下载的章节: {output_dir}", output_dir, failed_photo_ids)
             return output_dir
 
     def test_connection(self) -> list[SearchResult]:
@@ -224,7 +264,12 @@ class JmService:
 
     def _write_cbz_files(self, album, downloader, album_dir: Path, selected: set[str], metadata_album=None, cover_path: Path | None = None) -> None:
         metadata_album = metadata_album or album
-        photo_dict = downloader.download_success_dict.get(album, {})
+        failed_photo_ids = set(self._failed_photo_ids(downloader))
+        photo_dict = {
+            photo: image_list
+            for photo, image_list in downloader.download_success_dict.get(album, {}).items()
+            if image_list and str(photo.id) not in failed_photo_ids
+        }
         if not photo_dict:
             raise DownloadError("No chapters were downloaded.")
 
@@ -276,6 +321,42 @@ class JmService:
         if cover_path is None or not cover_path.exists():
             return
         shutil.copyfile(cover_path, cbz_path.with_suffix(".jpg"))
+
+    @staticmethod
+    def _download_failure_message(downloader) -> str:
+        photo_failures = getattr(downloader, "download_failed_photo", []) or []
+        image_failures = getattr(downloader, "download_failed_image", []) or []
+        if not photo_failures and not image_failures:
+            return ""
+
+        parts = ["部分下载失败"]
+        if photo_failures:
+            parts.append(f"共{len(photo_failures)}个章节下载失败")
+        if image_failures:
+            parts.append(f"共{len(image_failures)}个图片下载失败")
+
+        samples = []
+        for image, exc in image_failures[:3]:
+            samples.append(f"{getattr(image, 'download_url', image)}: {exc}")
+        for photo, exc in photo_failures[:3]:
+            samples.append(f"{getattr(photo, 'id', photo)}: {exc}")
+        if samples:
+            parts.append("；".join(samples))
+        return "，".join(parts)
+
+    @staticmethod
+    def _failed_photo_ids(downloader) -> list[str]:
+        failed_ids: set[str] = set()
+        for photo, _exc in getattr(downloader, "download_failed_photo", []) or []:
+            photo_id = getattr(photo, "id", None)
+            if photo_id is not None:
+                failed_ids.add(str(photo_id))
+        for image, _exc in getattr(downloader, "download_failed_image", []) or []:
+            photo = getattr(image, "from_photo", None)
+            photo_id = getattr(photo, "id", None)
+            if photo_id is not None:
+                failed_ids.add(str(photo_id))
+        return sorted(failed_ids)
 
     @staticmethod
     def _copy_images(temp_dir: Path, album_dir: Path) -> None:

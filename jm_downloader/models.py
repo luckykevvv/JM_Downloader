@@ -6,7 +6,7 @@ from typing import Any, Literal
 
 
 SearchType = Literal["id", "site", "author", "tag", "work", "actor"]
-TaskStatus = Literal["queued", "running", "completed", "failed"]
+TaskStatus = Literal["queued", "running", "completed", "partial", "failed"]
 
 
 @dataclass(slots=True)
@@ -91,6 +91,9 @@ class DownloadTask:
     photo_ids: list[str]
     status: TaskStatus = "queued"
     progress: str = "Queued"
+    progress_current: int = 0
+    progress_total: int = 0
+    failed_photo_ids: list[str] = field(default_factory=list)
     output_path: str = ""
     error: str = ""
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
@@ -103,6 +106,9 @@ class DownloadTask:
             "photo_ids": self.photo_ids,
             "status": self.status,
             "progress": self.progress,
+            "progress_current": self.progress_current,
+            "progress_total": self.progress_total,
+            "failed_photo_ids": self.failed_photo_ids,
             "output_path": self.output_path,
             "error": self.error,
             "created_at": self.created_at,

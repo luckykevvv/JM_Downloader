@@ -8,14 +8,24 @@
   </div>
   <div class="task-list">
     {% for task in tasks %}
-    <article class="task-row" data-task-id="{{ task.id }}">
+    <article class="task-row" data-task-id="{{ task.id }}" data-task-status="{{ task.status }}">
       <div>
         <strong>JM{{ task.album_id }}</strong>
-        <span class="badge {{ task.status }}">{{ task.status }}</span>
+        <span class="badge {{ task.status }}" data-task-status-badge>{{ task.status }}</span>
       </div>
-      <p>{{ task.progress }}</p>
+      <p data-task-progress-text>{{ task.progress }}</p>
+      <div class="task-progress">
+        <progress data-task-progress-bar value="{{ task.progress_current }}" max="{{ task.progress_total if task.progress_total else 1 }}"></progress>
+        <span class="muted" data-task-progress-count>
+          {% if task.progress_total %}{{ task.progress_current }}/{{ task.progress_total }}{% else %}等待开始{% endif %}
+        </span>
+      </div>
       {% if task.output_path %}<p class="muted">{{ task.output_path }}</p>{% endif %}
       {% if task.error %}<p class="error">{{ task.error }}</p>{% endif %}
+      <div class="actions" data-task-retry {% if not task.failed_photo_ids %}hidden{% endif %}>
+        <button type="button" data-retry-task="{{ task.id }}">重试失败章节</button>
+        <span class="muted" data-task-failed-count>{{ task.failed_photo_ids | length }} 章待重试</span>
+      </div>
     </article>
     {% else %}
     <p class="muted">暂无任务。</p>

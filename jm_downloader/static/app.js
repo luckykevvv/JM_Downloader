@@ -88,6 +88,12 @@ document.addEventListener("click", async (event) => {
   const unsubscribeButton = event.target.closest("[data-unsubscribe]");
   if (unsubscribeButton) {
     await unsubscribeAlbum(unsubscribeButton.dataset.unsubscribe);
+    return;
+  }
+
+  const retryButton = event.target.closest("[data-retry-task]");
+  if (retryButton) {
+    await retryTask(retryButton);
   }
 });
 
@@ -119,6 +125,12 @@ if (albumPanel) {
   loadAlbumDetail(albumPanel.dataset.albumId);
 }
 
+document.querySelectorAll(".task-row[data-task-id]").forEach((row) => {
+  if (!["completed", "partial", "failed"].includes(row.dataset.taskStatus || "")) {
+    watchTaskRow(row);
+  }
+});
+
 document.querySelector("#check-subscriptions")?.addEventListener("click", async () => {
   const status = document.querySelector("#subscription-status");
   status.textContent = "已开始检查订阅更新...";
@@ -145,12 +157,49 @@ function watchTask(taskId, target) {
   const source = new EventSource(`/api/downloads/${taskId}/events`);
   source.onmessage = (event) => {
     const task = JSON.parse(event.data);
-    target.textContent = `${task.status}: ${task.progress}`;
-    if (task.status === "completed" || task.status === "failed") {
+    target.innerHTML = renderTaskStatus(task);
+    if (task.status === "completed" || task.status === "partial" || task.status === "failed") {
       source.close();
     }
   };
   source.onerror = () => source.close();
+}
+
+function watchTaskRow(row) {
+  const source = new EventSource(`/api/downloads/${encodeURIComponent(row.dataset.taskId)}/events`);
+  source.onmessage = (event) => {
+    const task = JSON.parse(event.data);
+    updateTaskRow(row, task);
+    if (task.status === "completed" || task.status === "partial" || task.status === "failed") {
+      source.close();
+    }
+  };
+  source.onerror = () => source.close();
+}
+
+function updateTaskRow(row, task) {
+  row.dataset.taskStatus = task.status;
+  const badge = row.querySelector("[data-task-status-badge]");
+  if (badge) {
+    badge.className = `badge ${task.status}`;
+    badge.textContent = task.status;
+  }
+  const text = row.querySelector("[data-task-progress-text]");
+  if (text) text.textContent = task.progress || "";
+  const current = Number(task.progress_current || 0);
+  const total = Number(task.progress_total || 0);
+  const bar = row.querySelector("[data-task-progress-bar]");
+  if (bar) {
+    bar.value = current;
+    bar.max = total > 0 ? total : 1;
+  }
+  const count = row.querySelector("[data-task-progress-count]");
+  if (count) count.textContent = total > 0 ? `${current}/${total}` : "等待开始";
+  const failedIds = task.failed_photo_ids || [];
+  const retry = row.querySelector("[data-task-retry]");
+  if (retry) retry.hidden = failedIds.length === 0;
+  const failedCount = row.querySelector("[data-task-failed-count]");
+  if (failedCount) failedCount.textContent = `${failedIds.length} 章待重试`;
 }
 
 async function createDownload(albumId, photoIds) {
@@ -158,6 +207,35 @@ async function createDownload(albumId, photoIds) {
     method: "POST",
     body: JSON.stringify({ album_id: albumId, photo_ids: photoIds }),
   });
+}
+
+async function retryTask(button) {
+  const taskId = button.dataset.retryTask;
+  button.disabled = true;
+  button.textContent = "已加入队列";
+  try {
+    const task = await jsonFetch(`/api/downloads/${encodeURIComponent(taskId)}/retry`, { method: "POST" });
+    button.textContent = `重试任务：${task.id.slice(0, 8)}`;
+    showStatus(`重试任务已创建：${task.id}`);
+  } catch (error) {
+    button.disabled = false;
+    button.textContent = "重试失败章节";
+    showStatus(error.message, true);
+  }
+}
+
+function renderTaskStatus(task) {
+  const current = Number(task.progress_current || 0);
+  const total = Number(task.progress_total || 0);
+  const label = total > 0 ? `${current}/${total}` : "等待开始";
+  const max = total > 0 ? total : 1;
+  return `
+    <span>${escapeHtml(task.status)}: ${escapeHtml(task.progress)}</span>
+    <span class="task-progress">
+      <progress value="${escapeAttr(current)}" max="${escapeAttr(max)}"></progress>
+      <span class="muted">${escapeHtml(label)}</span>
+    </span>
+  `;
 }
 
 async function loadAlbumDetail(albumId) {

@@ -38,6 +38,9 @@ class Storage:
                     photo_ids TEXT NOT NULL,
                     status TEXT NOT NULL,
                     progress TEXT NOT NULL,
+                    progress_current INTEGER NOT NULL DEFAULT 0,
+                    progress_total INTEGER NOT NULL DEFAULT 0,
+                    failed_photo_ids TEXT NOT NULL DEFAULT '[]',
                     output_path TEXT NOT NULL,
                     error TEXT NOT NULL,
                     created_at TEXT NOT NULL,
@@ -45,6 +48,9 @@ class Storage:
                 )
                 """
             )
+            self._ensure_column(con, "tasks", "progress_current", "INTEGER NOT NULL DEFAULT 0")
+            self._ensure_column(con, "tasks", "progress_total", "INTEGER NOT NULL DEFAULT 0")
+            self._ensure_column(con, "tasks", "failed_photo_ids", "TEXT NOT NULL DEFAULT '[]'")
             con.execute(
                 """
                 CREATE TABLE IF NOT EXISTS subscriptions (
@@ -105,8 +111,11 @@ class Storage:
         with self.connect() as con:
             con.execute(
                 """
-                INSERT INTO tasks(id, album_id, photo_ids, status, progress, output_path, error, created_at, updated_at)
-                VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO tasks(
+                    id, album_id, photo_ids, status, progress, progress_current, progress_total,
+                    failed_photo_ids, output_path, error, created_at, updated_at
+                )
+                VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     task.id,
@@ -114,6 +123,9 @@ class Storage:
                     json.dumps(task.photo_ids),
                     task.status,
                     task.progress,
+                    task.progress_current,
+                    task.progress_total,
+                    json.dumps(task.failed_photo_ids),
                     task.output_path,
                     task.error,
                     task.created_at,
@@ -126,7 +138,8 @@ class Storage:
             return
         changes["updated_at"] = datetime.now(timezone.utc).isoformat()
         assignments = ", ".join(f"{key} = ?" for key in changes)
-        values = [json.dumps(value) if key == "photo_ids" else value for key, value in changes.items()]
+        json_fields = {"photo_ids", "failed_photo_ids"}
+        values = [json.dumps(value) if key in json_fields else value for key, value in changes.items()]
         values.append(task_id)
         with self.connect() as con:
             con.execute(f"UPDATE tasks SET {assignments} WHERE id = ?", values)
@@ -203,11 +216,20 @@ class Storage:
             photo_ids=json.loads(row["photo_ids"]),
             status=row["status"],
             progress=row["progress"],
+            progress_current=int(row["progress_current"]),
+            progress_total=int(row["progress_total"]),
+            failed_photo_ids=json.loads(row["failed_photo_ids"]),
             output_path=row["output_path"],
             error=row["error"],
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
+
+    @staticmethod
+    def _ensure_column(con: sqlite3.Connection, table: str, column: str, definition: str) -> None:
+        columns = {row["name"] for row in con.execute(f"PRAGMA table_info({table})")}
+        if column not in columns:
+            con.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
     @staticmethod
     def _row_to_subscription(row: sqlite3.Row) -> Subscription:
