@@ -5,6 +5,7 @@ import tempfile
 import threading
 import time
 import zipfile
+from contextlib import suppress
 from pathlib import Path
 from typing import Callable, Iterable
 
@@ -205,7 +206,8 @@ class JmService:
             output_dir = self._decide_output_dir(download_root, metadata_album, album, settings.single_volume_folder)
             ensure_inside(download_root, output_dir)
             output_dir.mkdir(parents=True, exist_ok=True)
-            self._write_cbz_files(album, downloader, output_dir, selected, metadata_album)
+            cover_path = self._download_album_cover(album, Path(temp_dir))
+            self._write_cbz_files(album, downloader, output_dir, selected, metadata_album, cover_path)
 
             if settings.keep_images:
                 self._copy_images(Path(temp_dir), output_dir)
@@ -217,7 +219,7 @@ class JmService:
     def test_connection(self) -> list[SearchResult]:
         return self.search("1", "id", 1, "mr", "a")
 
-    def _write_cbz_files(self, album, downloader, album_dir: Path, selected: set[str], metadata_album=None) -> None:
+    def _write_cbz_files(self, album, downloader, album_dir: Path, selected: set[str], metadata_album=None, cover_path: Path | None = None) -> None:
         metadata_album = metadata_album or album
         photo_dict = downloader.download_success_dict.get(album, {})
         if not photo_dict:
@@ -246,10 +248,20 @@ class JmService:
             )
             with zipfile.ZipFile(cbz_path, "w", zipfile.ZIP_DEFLATED) as archive:
                 archive.writestr("ComicInfo.xml", comicinfo)
+                if cover_path is not None and cover_path.exists():
+                    archive.write(cover_path, "cover.jpg")
                 for path, _image in sorted(image_list, key=lambda item: item[1].index):
                     source = Path(path)
                     if source.exists():
                         archive.write(source, source.name)
+
+    def _download_album_cover(self, album, temp_dir: Path) -> Path | None:
+        cover_path = temp_dir / f"cover-{album.id}.jpg"
+        with suppress(Exception):
+            self.client().download_album_cover(album.id, str(cover_path), size="")
+            if cover_path.exists() and cover_path.stat().st_size > 0:
+                return cover_path
+        return None
 
     @staticmethod
     def _copy_images(temp_dir: Path, album_dir: Path) -> None:

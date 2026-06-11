@@ -32,6 +32,7 @@ def test_build_comicinfo_xml_escapes_and_maps_fields():
     assert root.findtext("Title") == "Chapter <One>"
     assert root.findtext("Writer") == "Author A, Author B"
     assert root.findtext("Tags") == "tag<1, work, actor"
+    assert root.findtext("Manga") == "Webtoon"
     assert root.findtext("Year") == "2024"
     assert root.findtext("Month") == "5"
     assert root.findtext("Day") == "6"

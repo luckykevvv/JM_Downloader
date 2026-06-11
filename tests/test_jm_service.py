@@ -146,17 +146,20 @@ def test_write_cbz_files_contains_comicinfo_and_images(tmp_path):
     album = FakeAlbum([FakePhoto("10", 1, "Chapter 1")])
     image_path = tmp_path / "001.jpg"
     image_path.write_bytes(b"img")
+    cover_path = tmp_path / "cover.jpg"
+    cover_path.write_bytes(b"cover")
     photo = album.photos[0]
     downloader = SimpleNamespace(download_success_dict={album: {photo: [(str(image_path), SimpleNamespace(index=1))]}})
     out_dir = tmp_path / "Album"
     out_dir.mkdir()
 
-    service._write_cbz_files(album, downloader, out_dir, set())
+    service._write_cbz_files(album, downloader, out_dir, set(), cover_path=cover_path)
 
     cbz = out_dir / "Album.cbz"
     assert cbz.exists()
     with zipfile.ZipFile(cbz) as archive:
         assert "ComicInfo.xml" in archive.namelist()
+        assert "cover.jpg" in archive.namelist()
         assert "001.jpg" in archive.namelist()
 
 
